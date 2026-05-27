@@ -2,15 +2,12 @@ const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
-
 const app = express();
 const PORT = process.env.PORT || 3000;
 const CANVAS_FILE = path.join(__dirname, 'canvas.png');
-
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 
-// GET /api/canvas — return the current canvas as a PNG data URL
 app.get('/api/canvas', (req, res) => {
   if (!fs.existsSync(CANVAS_FILE)) {
     return res.json({ data: null });
@@ -19,7 +16,6 @@ app.get('/api/canvas', (req, res) => {
   res.json({ data: 'data:image/png;base64,' + data });
 });
 
-// POST /api/canvas — accept base64 data URL, store as PNG
 app.post('/api/canvas', (req, res) => {
   const { data } = req.body;
   if (!data || !data.startsWith('data:image/png;base64,')) {
@@ -30,6 +26,10 @@ app.post('/api/canvas', (req, res) => {
   res.json({ ok: true });
 });
 
-app.get('/', (req, res) => res.json({ status: 'canvas api running' }));
+app.delete('/api/canvas', (req, res) => {
+  if (fs.existsSync(CANVAS_FILE)) fs.unlinkSync(CANVAS_FILE);
+  res.json({ ok: true });
+});
 
+app.get('/', (req, res) => res.json({ status: 'canvas api running' }));
 app.listen(PORT, () => console.log(`Canvas API running on port ${PORT}`));
