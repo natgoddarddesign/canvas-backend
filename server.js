@@ -6,7 +6,6 @@ const PORT = process.env.PORT || 3000;
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 const GITHUB_REPO = 'natgoddarddesign/canvas-backend';
 const GITHUB_FILE = 'canvas.png';
-const RAW_URL = `https://raw.githubusercontent.com/${GITHUB_REPO}/main/${GITHUB_FILE}`;
 const API_URL = `https://api.github.com/repos/${GITHUB_REPO}/contents/${GITHUB_FILE}`;
 
 app.use(cors());
@@ -14,10 +13,17 @@ app.use(express.json({ limit: '10mb' }));
 
 app.get('/api/canvas', async (req, res) => {
   try {
-    const r = await fetch(RAW_URL + '?t=' + Date.now());
+    // Use API not raw URL — bypasses CDN cache, always fresh
+    const r = await fetch(API_URL, {
+      headers: {
+        Authorization: `token ${GITHUB_TOKEN}`,
+        'User-Agent': 'canvas-backend',
+        'Accept': 'application/vnd.github.v3+json'
+      }
+    });
     if (!r.ok) return res.json({ data: null });
-    const buf = await r.arrayBuffer();
-    const b64 = Buffer.from(buf).toString('base64');
+    const json = await r.json();
+    const b64 = json.content.replace(/\n/g, '');
     res.json({ data: 'data:image/png;base64,' + b64 });
   } catch (e) {
     res.json({ data: null });
@@ -32,7 +38,6 @@ app.post('/api/canvas', async (req, res) => {
   const base64 = data.replace('data:image/png;base64,', '');
 
   try {
-    // Get current file SHA (required by GitHub API to update a file)
     let sha;
     const check = await fetch(API_URL, {
       headers: { Authorization: `token ${GITHUB_TOKEN}`, 'User-Agent': 'canvas-backend' }
@@ -42,11 +47,7 @@ app.post('/api/canvas', async (req, res) => {
       sha = json.sha;
     }
 
-    const body = {
-      message: 'update canvas',
-      content: base64,
-      ...(sha && { sha })
-    };
+    const body = { message: 'update canvas', content: base64, ...(sha && { sha }) };
 
     const put = await fetch(API_URL, {
       method: 'PUT',
@@ -58,10 +59,7 @@ app.post('/api/canvas', async (req, res) => {
       body: JSON.stringify(body)
     });
 
-    if (!put.ok) {
-      const err = await put.text();
-      return res.status(500).json({ error: err });
-    }
+    if (!put.ok) return res.status(500).json({ error: await put.text() });
     res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: e.message });
