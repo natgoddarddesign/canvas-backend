@@ -13,7 +13,6 @@ app.use(express.json({ limit: '10mb' }));
 
 app.get('/api/canvas', async (req, res) => {
   try {
-    // Use API not raw URL — bypasses CDN cache, always fresh
     const r = await fetch(API_URL, {
       headers: {
         Authorization: `token ${GITHUB_TOKEN}`,
